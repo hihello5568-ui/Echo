@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal | FISAT ECHO</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { orange: '#F59E0B', dark: '#0B0F19', card: '#111827' }
+                    },
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+
+    <style>
+        body { animation: bodyFadeIn 0.5s ease forwards; }
+        @keyframes bodyFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #login-card { animation: loginSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform: translateY(40px); opacity: 0; }
+        @keyframes loginSlideUp { to { transform: translateY(0); opacity: 1; } }
+
+        .admin-input {
+            display: block; width: 100%; padding: 0.625rem 1rem; border-radius: 0.75rem; border: 1.5px solid #d1d5db;
+            background-color: #f9fafb; color: #111827; font-size: 0.875rem; font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+        }
+        .admin-input::placeholder { color: #9ca3af; }
+        .admin-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+        .dark .admin-input { background-color: #1f2937; border-color: #374151; color: #f3f4f6; }
+        .dark .admin-input::placeholder { color: #6b7280; }
+        .dark .admin-input:focus { border-color: #F59E0B; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
+
+        .sidebar-tab {
+            display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left; padding: 0.75rem 1rem;
+            border-radius: 0.75rem; font-weight: 600; font-size: 0.875rem; transition: background 0.2s, color 0.2s; cursor: pointer; border: none; background: transparent; color: inherit;
+        }
+        .sidebar-tab:hover { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+        .sidebar-tab.active { background: #F59E0B; color: #fff; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35); }
+
+        .admin-panel { animation: panelSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        @keyframes panelSlideIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+
+        .list-row {
+            display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1rem;
+            border-radius: 0.75rem; border: 1px solid #e5e7eb; background: #f9fafb; transition: background 0.2s; gap: 1rem;
+        }
+        .dark .list-row { border-color: #374151; background: rgba(31, 41, 55, 0.5); }
+        .list-row:hover { background: #f3f4f6; }
+        .dark .list-row:hover { background: rgba(31, 41, 55, 0.9); }
+
+        html { scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 7px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .scroll-list { scrollbar-width: thin; scrollbar-color: #6b7280 transparent; }
+        .scroll-list::-webkit-scrollbar { width: 5px; }
+
+        #toast { transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.35s ease; }
+        #toast.show { transform: translateY(0) !important; opacity: 1 !important; }
+        .modal-backdrop { backdrop-filter: blur(4px); }
+
+        .notif-badge {
+            position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; border-radius: 9999px;
+            font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 2px solid; border-color: #fff;
+        }
+        .dark .notif-badge { border-color: #111827; }
+
+        .type-toggle-btn {
+            flex: 1; padding: 0.5rem 1rem; font-weight: 700; font-size: 0.875rem; border-radius: 0.625rem; transition: all 0.2s; cursor: pointer; border: 1.5px solid transparent;
+        }
+        .type-toggle-btn.selected { background: #F59E0B; color: #fff; border-color: #F59E0B; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+        .type-toggle-btn:not(.selected) { background: transparent; color: #6b7280; border-color: #d1d5db; }
+        .dark .type-toggle-btn:not(.selected) { color: #9ca3af; border-color: #374151; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-brand-dark text-gray-900 dark:text-gray-100 font-sans min-h-screen">
+
+    <div id="toast" class="fixed bottom-5 right-5 z-[9998] flex items-center gap-3 px-5 py-4 bg-gray-900 dark:bg-gray-800 text-white rounded-xl shadow-2xl border border-gray-700 translate-y-24 opacity-0">
+        <i id="toast-icon" class="fas fa-check-circle text-brand-orange text-xl"></i>
+        <span id="toast-message" class="font-semibold text-sm tracking-wide">Done</span>
+    </div>
+
+    <!-- Datalist to hold unique existing team names for easy entry -->
+    <datalist id="existing-teams"></datalist>
+
+    <!-- Modals & Panels -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center px-4 modal-backdrop">
+        <div class="bg-white dark:bg-brand-card p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 mb-4 mx-auto"><i class="fas fa-exclamation-triangle text-red-500 text-xl"></i></div>
+            <h3 class="text-xl font-bold text-center mb-2">Confirm Deletion</h3>
+            <p class="text-center text-gray-500 dark:text-gray-400 text-sm mb-6">This item will be permanently removed.</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 py-2.5 rounded-xl font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">Cancel</button>
+                <button onclick="executeDelete()" class="flex-1 py-2.5 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 transition-colors">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notif-panel" class="hidden fixed top-16 right-4 z-[200] w-80 max-h-[70vh] bg-white dark:bg-brand-card rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h3 class="font-bold text-base">Contact Messages</h3>
+            <button onclick="markAllRead()" class="text-xs text-brand-orange hover:underline font-semibold">Mark all read</button>
+        </div>
+        <div id="notif-list" class="overflow-y-auto scroll-list flex-1 divide-y divide-gray-100 dark:divide-gray-700/50"><p class="text-sm text-gray-400 text-center py-8">No messages yet.</p></div>
+    </div>
+
+    <!-- Edit Event Modal -->
+    <div id="edit-event-modal" class="hidden fixed inset-0 bg-black/60 z-[150] flex items-center justify-center px-4 modal-backdrop">
+        <!-- Event Edit Form (Same as before) -->
+        <div class="bg-white dark:bg-brand-card p-6 rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold">Edit Event</h3>
+                <button onclick="closeEditEventModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex flex-col gap-4">
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Event Name <span class="text-red-500">*</span></label><input type="text" id="edit-ev-name" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Start Date <span class="text-red-500">*</span></label><input type="date" id="edit-ev-date" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Status</label><select id="edit-ev-status" class="admin-input"><option value="upcoming">Upcoming</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option></select></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Event Poster URL</label><input type="url" id="edit-ev-poster" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Button Label</label><input type="text" id="edit-ev-btn-label" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Button URL</label><input type="url" id="edit-ev-btn-url" class="admin-input"></div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="closeEditEventModal()" class="flex-1 py-2.5 rounded-xl font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">Cancel</button>
+                    <button onclick="saveEditedEvent()" class="flex-1 py-2.5 rounded-xl font-bold bg-brand-orange text-white flex items-center justify-center gap-2"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Member Modal -->
+    <div id="edit-member-modal" class="hidden fixed inset-0 bg-black/60 z-[150] flex items-center justify-center px-4 modal-backdrop">
+        <div class="bg-white dark:bg-brand-card p-6 rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold">Edit Member</h3>
+                <button onclick="closeEditMemberModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex flex-col gap-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Member Type</label>
+                        <select id="edit-m-type" class="admin-input" onchange="toggleEditTeamInput()"><option value="student">Student / Exec</option><option value="faculty">Faculty Mentor</option></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Priority (Sort Order)</label>
+                        <input type="number" id="edit-m-priority" class="admin-input" placeholder="e.g. 1">
+                    </div>
+                </div>
+
+                <!-- Display Format logic for Edit -->
+                <div class="grid grid-cols-2 gap-4" id="wrap-edit-display-format">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Display Format</label>
+                        <select id="edit-m-display" class="admin-input" onchange="toggleEditTeamInput()">
+                            <option value="individual">Individual Profile</option>
+                            <option value="team">Grouped in a Team</option>
+                        </select>
+                    </div>
+                    <div id="wrap-edit-team-name" class="hidden">
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Team Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="edit-m-team-name" class="admin-input" list="existing-teams" placeholder="e.g. Web Team">
+                    </div>
+                </div>
+
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Full Name <span class="text-red-500">*</span></label><input type="text" id="edit-m-name" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Role <span class="text-red-500">*</span></label><input type="text" id="edit-m-role" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Photo URL <span class="text-red-500">*</span></label><input type="url" id="edit-m-image" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Description</label><textarea id="edit-m-desc" rows="2" class="admin-input"></textarea></div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Profile Link</label>
+                    <div class="flex gap-2">
+                        <select id="edit-m-link-type" class="admin-input w-40">
+                            <option value="linkedin">LinkedIn</option>
+                            <option value="portfolio">Portfolio</option>
+                            <option value="college">College Site</option>
+                        </select>
+                        <input type="url" id="edit-m-link-url" class="admin-input flex-1" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="closeEditMemberModal()" class="flex-1 py-2.5 rounded-xl font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">Cancel</button>
+                    <button onclick="saveEditedMember()" class="flex-1 py-2.5 rounded-xl font-bold bg-brand-orange text-white flex items-center justify-center gap-2"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Achievement Modal -->
+    <div id="edit-achievement-modal" class="hidden fixed inset-0 bg-black/60 z-[150] flex items-center justify-center px-4 modal-backdrop">
+        <div class="bg-white dark:bg-brand-card p-6 rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold">Edit Achievement</h3>
+                <button onclick="closeEditAchievementModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex flex-col gap-4">
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Title <span class="text-red-500">*</span></label><input type="text" id="edit-a-title" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Member Names <span class="text-red-500">*</span></label><input type="text" id="edit-a-names" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Date</label><input type="date" id="edit-a-date" class="admin-input"></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Description <span class="text-red-500">*</span></label><textarea id="edit-a-desc" rows="3" class="admin-input"></textarea></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Image URL</label><input type="url" id="edit-a-image" class="admin-input" placeholder="https://..."></div>
+                <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Link</label><input type="url" id="edit-a-link" class="admin-input"></div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="closeEditAchievementModal()" class="flex-1 py-2.5 rounded-xl font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">Cancel</button>
+                    <button onclick="saveEditedAchievement()" class="flex-1 py-2.5 rounded-xl font-bold bg-brand-orange text-white flex items-center justify-center gap-2"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="flex items-center justify-center min-h-screen px-4 py-10">
+        <div id="login-card" class="w-full max-w-md bg-white dark:bg-brand-card rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 p-8">
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-16 h-16 bg-black rounded-2xl flex items-center justify-center shadow-lg mb-4 overflow-hidden">
+                    <img src="https://lh3.googleusercontent.com/d/1aFFlIwdpDMN-gA4J1w1QKDNFZ_AX4QRa" class="w-full h-full object-contain p-1">
+                </div>
+                <h1 class="text-2xl font-extrabold">ECHO Admin</h1>
+            </div>
+            <div id="login-error" class="hidden mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium"><i class="fas fa-times-circle mr-2"></i><span id="login-error-text">Invalid credentials.</span></div>
+            <div class="mb-4"><label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Email</label><input type="text" id="login-username" class="admin-input" onkeydown="if(event.key==='Enter') attemptLogin()"></div>
+            <div class="mb-6 relative"><label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Password</label><input type="password" id="login-password" class="admin-input pr-12" onkeydown="if(event.key==='Enter') attemptLogin()"><button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-[2.35rem] text-gray-400 hover:text-gray-600"><i id="pw-eye-icon" class="fas fa-eye text-sm"></i></button></div>
+            <button onclick="attemptLogin()" id="login-btn" class="w-full bg-brand-orange hover:bg-yellow-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+           <!--<div class="text-center mt-5"><a href="index.html" class="text-sm text-gray-400 hover:text-brand-orange"><i class="fas fa-arrow-left mr-1"></i> Back to main website</a></div> -->
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" class="hidden min-h-screen flex flex-col">
+        <header class="bg-white dark:bg-brand-card border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-black rounded-xl flex items-center justify-center shadow-md overflow-hidden">
+                    <img src="https://lh3.googleusercontent.com/d/1aFFlIwdpDMN-gA4J1w1QKDNFZ_AX4QRa" class="w-full h-full object-contain p-0.5">
+                </div>
+                <div><p class="font-extrabold text-base leading-tight">ECHO Admin</p></div>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="relative"><button id="notif-btn" onclick="toggleNotifPanel()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"><i class="fas fa-bell text-gray-600 dark:text-gray-300"></i><span id="notif-badge" class="notif-badge hidden">0</span></button></div>
+                <button onclick="toggleTheme()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i class="fas fa-moon dark:hidden text-gray-600"></i><i class="fas fa-sun hidden dark:block text-yellow-400"></i></button>
+                <button onclick="logout()" class="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors"><i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline">Sign Out</span></button>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden">
+            <aside class="w-56 flex-shrink-0 bg-white dark:bg-brand-card border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-1 hidden md:flex">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Sections</p>
+                <button onclick="showPanel('members')" id="tab-members" class="sidebar-tab active"><i class="fas fa-users w-4"></i> Members</button>
+                <button onclick="showPanel('achievements')" id="tab-achievements" class="sidebar-tab"><i class="fas fa-trophy w-4"></i> Achievements</button>
+                <button onclick="showPanel('activities')" id="tab-activities" class="sidebar-tab"><i class="fas fa-calendar-alt w-4"></i> Activities</button>
+                <button onclick="showPanel('events')" id="tab-events" class="sidebar-tab"><i class="fas fa-star w-4"></i> Events</button>
+                <button onclick="showPanel('messages')" id="tab-messages" class="sidebar-tab"><i class="fas fa-envelope w-4"></i> Messages</button>
+            </aside>
+
+            <!-- Mobile Tab Bar -->
+            <div class="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-brand-card border-t border-gray-200 flex justify-around py-2 px-1">
+                <button onclick="showPanel('members')" class="flex flex-col items-center text-xs gap-0.5 text-gray-500 hover:text-brand-orange px-2"><i class="fas fa-users text-lg"></i></button>
+                <button onclick="showPanel('achievements')" class="flex flex-col items-center text-xs gap-0.5 text-gray-500 hover:text-brand-orange px-2"><i class="fas fa-trophy text-lg"></i></button>
+                <button onclick="showPanel('activities')" class="flex flex-col items-center text-xs gap-0.5 text-gray-500 hover:text-brand-orange px-2"><i class="fas fa-calendar-alt text-lg"></i></button>
+                <button onclick="showPanel('events')" class="flex flex-col items-center text-xs gap-0.5 text-gray-500 hover:text-brand-orange px-2"><i class="fas fa-star text-lg"></i></button>
+                <button onclick="showPanel('messages')" class="flex flex-col items-center text-xs gap-0.5 text-gray-500 hover:text-brand-orange px-2"><i class="fas fa-envelope text-lg"></i></button>
+            </div>
+
+            <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
+                
+                <!-- MEMBERS PANEL -->
+                <div id="panel-members" class="admin-panel">
+                    <h2 class="text-2xl font-extrabold mb-6 flex items-center gap-2"><i class="fas fa-users text-brand-orange"></i> Manage Members</h2>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 dark:border-gray-800 shadow-sm mb-8">
+                        <h3 class="font-bold text-lg mb-5"><i class="fas fa-plus-circle text-brand-orange mr-2"></i>Add Member</h3>
+                        <div class="mb-5">
+                            <div class="flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                                <button type="button" id="type-btn-student" class="type-toggle-btn selected" onclick="setMemberType('student')">Student / Exec</button>
+                                <button type="button" id="type-btn-faculty" class="type-toggle-btn" onclick="setMemberType('faculty')">Faculty Mentor</button>
+                            </div>
+                        </div>
+                        <form id="form-members" onsubmit="handleSubmit(event, 'members')" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <input type="hidden" id="m-type" value="student">
+                            
+                            <!-- Display Format (Only for Students/Execs) -->
+                            <div id="wrap-display-format">
+                                <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Display Format</label>
+                                <select id="m-display" class="admin-input" onchange="toggleTeamInput()">
+                                    <option value="individual">Individual Profile</option>
+                                    <option value="team">Grouped in a Team</option>
+                                </select>
+                            </div>
+                            <div id="wrap-team-name" class="hidden">
+                                <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Team Name *</label>
+                                <input type="text" id="m-team-name" class="admin-input" list="existing-teams" placeholder="e.g. Web Team">
+                                <p class="text-[10px] text-gray-400 mt-1">Select from list or type a new one.</p>
+                            </div>
+
+                            <div><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Full Name *</label><input type="text" id="m-name" required class="admin-input"></div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Priority (Sort Order)</label>
+                                <input type="number" id="m-priority" value="10" class="admin-input" placeholder="e.g. 1 for Chairman">
+                                <p class="text-[10px] text-gray-400 mt-1">Lower numbers appear first.</p>
+                            </div>
+                            <div class="sm:col-span-2"><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Role *</label><input type="text" id="m-role" required class="admin-input" placeholder="e.g. Secretary, Web Developer"></div>
+                            <div class="sm:col-span-2"><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Photo URL *</label><input type="url" id="m-image" required class="admin-input"></div>
+                            <div class="sm:col-span-2"><label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Description</label><textarea id="m-desc" rows="2" class="admin-input"></textarea></div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-sm font-semibold mb-1.5 text-gray-600 dark:text-gray-400">Profile Link</label>
+                                <div class="flex gap-2">
+                                    <select id="m-link-type" class="admin-input w-40">
+                                        <option value="linkedin">LinkedIn</option>
+                                        <option value="portfolio">Portfolio</option>
+                                        <option value="college">College Site</option>
+                                    </select>
+                                    <input type="url" id="m-link-url" class="admin-input flex-1" placeholder="https://...">
+                                </div>
+                            </div>
+                            <div class="sm:col-span-2"><button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"><i class="fas fa-plus"></i> Add Member</button></div>
+                        </form>
+                    </div>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+                        <h3 class="font-bold text-lg mb-4">Current Members <span id="count-members" class="ml-2 text-sm text-gray-400"></span></h3>
+                        <div id="list-members" class="space-y-3 max-h-96 overflow-y-auto scroll-list pr-1"></div>
+                    </div>
+                </div>
+
+                <!-- ACHIEVEMENTS PANEL -->
+                <div id="panel-achievements" class="admin-panel hidden">
+                    <h2 class="text-2xl font-extrabold mb-6"><i class="fas fa-trophy text-brand-orange"></i> Manage Achievements</h2>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 dark:border-gray-800 mb-8">
+                        <form id="form-achievements" onsubmit="handleSubmit(event, 'achievements')" class="flex flex-col gap-4">
+                            <div><label class="block text-sm font-semibold mb-1.5">Title *</label><input type="text" id="a-title" required class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Member Names *</label><input type="text" id="a-names" required class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Date</label><input type="date" id="a-date" class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Description *</label><textarea id="a-desc" required rows="3" class="admin-input"></textarea></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Image URL</label><input type="url" id="a-image" class="admin-input" placeholder="https://..."><p class="text-[10px] text-gray-400 mt-1">Optional. Link to an image (certificate, photo, patent scan) to show on the main site.</p></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Link</label><input type="url" id="a-link" class="admin-input"></div>
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg">Add Achievement</button>
+                        </form>
+                    </div>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 dark:border-gray-800">
+                        <h3 class="font-bold text-lg mb-4">Current <span id="count-achievements" class="text-sm text-gray-400"></span></h3>
+                        <div id="list-achievements" class="space-y-3 max-h-96 overflow-y-auto scroll-list"></div>
+                    </div>
+                </div>
+
+                <!-- ACTIVITIES PANEL -->
+                <div id="panel-activities" class="admin-panel hidden">
+                    <h2 class="text-2xl font-extrabold mb-6"><i class="fas fa-calendar-alt text-brand-orange"></i> Manage Activities</h2>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 mb-8">
+                        <form id="form-activities" onsubmit="handleSubmit(event, 'activities')" class="flex flex-col gap-4">
+                            <div><label class="block text-sm font-semibold mb-1.5">Title *</label><input type="text" id="act-title" required class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Date</label><input type="date" id="act-date" class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Report URL</label><input type="url" id="act-link" class="admin-input"></div>
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg">Add Activity</button>
+                        </form>
+                    </div>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200">
+                        <h3 class="font-bold text-lg mb-4">Current <span id="count-activities" class="text-sm text-gray-400"></span></h3>
+                        <div id="list-activities" class="space-y-3 max-h-96 overflow-y-auto scroll-list"></div>
+                    </div>
+                </div>
+
+                <!-- EVENTS PANEL -->
+                <div id="panel-events" class="admin-panel hidden">
+                    <h2 class="text-2xl font-extrabold mb-6"><i class="fas fa-star text-brand-orange"></i> Manage Events</h2>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200 mb-8">
+                        <form id="form-events" onsubmit="handleSubmit(event, 'events')" class="flex flex-col gap-4">
+                            <div><label class="block text-sm font-semibold mb-1.5">Status *</label><select id="ev-status" required class="admin-input"><option value="upcoming">Upcoming</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option></select></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Name *</label><input type="text" id="ev-name" required class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Date *</label><input type="date" id="ev-date" required class="admin-input"></div>
+                            <div><label class="block text-sm font-semibold mb-1.5">Poster URL</label><input type="url" id="ev-poster" class="admin-input"></div>
+                            <div class="bg-brand-orange/5 border border-brand-orange/20 rounded-xl p-4">
+                                <div><label class="block text-xs font-semibold mb-1">Button Label</label><input type="text" id="ev-btn-label" class="admin-input"></div>
+                                <div class="mt-3"><label class="block text-xs font-semibold mb-1">Button URL</label><input type="url" id="ev-btn-url" class="admin-input"></div>
+                            </div>
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg">Add Event</button>
+                        </form>
+                    </div>
+                    <div class="bg-white dark:bg-brand-card rounded-2xl p-6 border border-gray-200">
+                        <h3 class="font-bold text-lg mb-4">Current <span id="count-events" class="text-sm text-gray-400"></span></h3>
+                        <div id="list-events" class="space-y-3 max-h-96 overflow-y-auto scroll-list"></div>
+                    </div>
+                </div>
+
+                <!-- MESSAGES PANEL -->
+                <div id="panel-messages" class="admin-panel hidden">
+                    <h2 class="text-2xl font-extrabold mb-6"><i class="fas fa-envelope text-brand-orange"></i> Messages <span id="count-messages" class="text-sm text-gray-400"></span></h2>
+                    <div id="list-messages" class="space-y-4"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+<script src="script.js"></script>
+   
+</body>
+</html>

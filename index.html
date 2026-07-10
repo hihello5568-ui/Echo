@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FISAT ECHO | Electronics & Communication Heuristic Organisation</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            orange: '#F59E0B',
+                            dark:   '#0B0F19',
+                            card:   '#111827',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        /* ============================================================
+           SECTION 1 — INTRO OVERLAY & CORE ANIMATION
+           ============================================================ */
+        #intro-overlay {
+            position: fixed; inset: 0; background: #000; z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            animation: introFadeOut 0.9s 2.2s ease-in-out forwards;
+            pointer-events: none;
+        }
+        .intro-logo {
+            display: flex; flex-direction: column; align-items: center;
+            animation: introRise 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transform: translateY(120px); opacity: 0;
+        }
+        @keyframes introRise {
+            0%   { transform: translateY(120px); opacity: 0; }
+            30%  { opacity: 1; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes introFadeOut {
+            0%   { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+
+        .page-enter {
+            opacity: 0; transform: translateY(-30px);
+            animation: pageEnter 0.8s 2.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes pageEnter { to { opacity: 1; transform: translateY(0); } }
+
+        /* ============================================================
+           SECTION 2 — SCROLL-REVEAL ANIMATION
+           ============================================================ */
+        .reveal {
+            opacity: 0; transform: translateY(40px);
+            transition: opacity 0.75s cubic-bezier(0.5, 0, 0, 1), transform 0.75s cubic-bezier(0.5, 0, 0, 1);
+        }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+
+        /* ============================================================
+           SECTION 3 — HERO EFFECTS & GLOBALS
+           ============================================================ */
+        @keyframes blobFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50%       { transform: translateY(-24px) scale(1.04); }
+        }
+        .blob-1 { animation: blobFloat 7s ease-in-out infinite; }
+        .blob-2 { animation: blobFloat 9s ease-in-out 2s infinite; }
+
+        .nav-link { position: relative; }
+        .nav-link::after {
+            content: ''; position: absolute; width: 0; height: 2px;
+            bottom: -4px; left: 0; background: #F59E0B; transition: width 0.3s ease;
+        }
+        .nav-link:hover::after { width: 100%; }
+
+        .glow-card { transition: transform 0.35s ease, box-shadow 0.35s ease; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .glow-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(245, 158, 11, 0.18); }
+
+        .text-gradient {
+            background: linear-gradient(135deg, #F59E0B 0%, #ef4444 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        html { scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 7px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+        #toast { transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.35s ease; }
+        #toast.show { transform: translateY(0) !important; opacity: 1 !important; }
+
+        /* ============================================================
+           SECTION 4 — COMPONENT SPECIFIC STYLES
+           ============================================================ */
+        
+        /* Event Cards */
+        .event-card {
+            position: relative; border-radius: 1.25rem; display: flex; flex-direction: column;
+            min-height: 400px; transition: transform 0.35s ease, box-shadow 0.35s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+        .event-card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px rgba(245, 158, 11, 0.2); }
+        .event-status-badge {
+            display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 9999px; letter-spacing: 0.05em; text-transform: uppercase;
+        }
+        .event-status-upcoming  { background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); }
+        .event-status-ongoing   { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+        .event-status-completed { background: rgba(156,163,175,0.15); color: #9ca3af; border: 1px solid rgba(156,163,175,0.3); }
+
+        /* Member Specifics */
+        .member-card-wrapper { position: relative; cursor: default; }
+        .member-card-wrapper.has-link { cursor: pointer; }
+        
+        /* Profile Tooltips and Badges */
+        .profile-badge {
+            position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff;
+            opacity: 0; transform: scale(0.7); transition: opacity 0.25s ease, transform 0.25s ease; z-index: 10; pointer-events: none;
+        }
+        .profile-badge.linkedin { background: #0077B5; }
+        .profile-badge.portfolio { background: #6366f1; }
+        .profile-badge.college { background: #10b981; }
+        .member-card-wrapper:hover .profile-badge { opacity: 1; transform: scale(1); }
+
+        .member-tooltip {
+            position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px);
+            background: rgba(0,0,0,0.85); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap;
+            padding: 5px 10px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 20;
+        }
+        .member-tooltip::after {
+            content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            border: 5px solid transparent; border-top-color: rgba(0,0,0,0.85);
+        }
+        .member-card-wrapper:hover .member-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* Mentor Cards */
+        .mentor-card { position: relative; transition: transform 0.35s ease, box-shadow 0.35s ease; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .mentor-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(245, 158, 11, 0.2); }
+        .mentor-card:hover .profile-badge { opacity: 1; transform: scale(1); }
+        .mentor-card:hover .member-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .activity-row-link { cursor: pointer; }
+        .activity-row-nolink { cursor: default; }
+
+        /* Modal Animations */
+        #team-modal-content { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        #team-modal.open-modal #team-modal-content { transform: scale(1); opacity: 1; }
+        #team-modal-backdrop { transition: opacity 0.3s ease; opacity: 0; }
+        #team-modal.open-modal #team-modal-backdrop { opacity: 1; }
+
+        #achievement-modal-content { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        #achievement-modal.open-modal #achievement-modal-content { transform: scale(1); opacity: 1; }
+        #achievement-modal-backdrop { transition: opacity 0.3s ease; opacity: 0; }
+        #achievement-modal.open-modal #achievement-modal-backdrop { opacity: 1; }
+
+        /* Achievements: clean centered card stack — cards sit directly behind
+           one another (no diagonal fan) for a tidy, professional look. */
+        .ach-stage {
+            position: relative;
+            padding: 0.5rem 0.5rem 2.25rem;
+        }
+        .ach-card-slot {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+        }
+        .ach-front {
+            position: relative;
+            z-index: 10;
+            margin: 0 auto;
+        }
+        .ach-peek {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            pointer-events: none;
+            user-select: none;
+        }
+        /* Directly behind the front card — centered, only depth (scale + Y offset + fade) changes */
+        .ach-peek-right {
+            z-index: 3;
+            transform: translateX(-50%) translateY(14px) scale(0.95);
+            opacity: 0.55;
+        }
+        .ach-peek-left {
+            z-index: 2;
+            transform: translateX(-50%) translateY(26px) scale(0.90);
+            opacity: 0.32;
+        }
+
+        /* Liquid glass material */
+        .liquid-glass {
+            position: relative;
+            border-radius: 28px;
+            background: linear-gradient(160deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.34) 55%, rgba(255,255,255,0.20) 100%);
+            backdrop-filter: blur(22px) saturate(180%);
+            -webkit-backdrop-filter: blur(22px) saturate(180%);
+            border: 1px solid rgba(255,255,255,0.55);
+            box-shadow: 0 10px 34px rgba(15,23,42,0.14), inset 0 1px 1px rgba(255,255,255,0.8), inset 0 -14px 20px -14px rgba(255,255,255,0.35);
+            overflow: hidden;
+        }
+        .liquid-glass::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(115deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 26%, rgba(255,255,255,0) 72%, rgba(255,255,255,0.30) 100%);
+            mix-blend-mode: overlay;
+            pointer-events: none;
+        }
+        .liquid-glass::after {
+            content: '';
+            position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
+        }
+        .dark .liquid-glass {
+            background: linear-gradient(160deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.05) 55%, rgba(255,255,255,0.02) 100%);
+            border-color: rgba(255,255,255,0.16);
+            box-shadow: 0 10px 34px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -14px 20px -14px rgba(255,255,255,0.05);
+        }
+
+        @keyframes achFadeIn {
+            from { opacity: 0; transform: translateY(8px) scale(0.96); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* New front card zooms + fades in from the depth position it was just occupying —
+           straight forward motion, no sideways slide, so the stack always reads as
+           cards sitting directly behind one another. */
+        @keyframes achRiseFromRight {
+            from { opacity: 0.55; transform: translateY(14px) scale(0.95); }
+            to   { opacity: 1;    transform: translateY(0) scale(1); }
+        }
+        @keyframes achRiseFromLeft {
+            from { opacity: 0.32; transform: translateY(26px) scale(0.90); }
+            to   { opacity: 1;    transform: translateY(0) scale(1); }
+        }
+        .ach-anim-fade { animation: achFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+        .ach-anim-next { animation: achRiseFromRight 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+        .ach-anim-prev { animation: achRiseFromLeft 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+        /* Peek cards ease into their depth position too, so the whole stack feels alive */
+        .ach-peek { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease; }
+
+        .ach-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 20;
+            width: 46px;
+            height: 46px;
+            border-radius: 9999px;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+            align-items: center;
+            justify-content: center;
+            color: #F59E0B;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.06);
+            transition: all 0.2s ease;
+            display: flex;
+        }
+        .dark .ach-arrow { background: #172033; border-color: rgba(255,255,255,0.08); }
+        .ach-arrow:hover { background: #F59E0B; color: #fff; }
+        .ach-arrow.ach-disabled { opacity: 0.25; pointer-events: none; }
+        .ach-arrow-left { left: -2px; }
+        .ach-arrow-right { right: -2px; }
+        @media (min-width: 480px) {
+            .ach-arrow-left { left: -18px; }
+            .ach-arrow-right { right: -18px; }
+        }
+
+        .achievement-desc-clamp {
+            display: -webkit-box;
+            line-clamp: 3;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+
+        /* Activities: "view all" modal transitions */
+        #activities-modal-content { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        #activities-modal.open-modal #activities-modal-content { transform: scale(1); opacity: 1; }
+        #activities-modal-backdrop { transition: opacity 0.3s ease; opacity: 0; }
+        #activities-modal.open-modal #activities-modal-backdrop { opacity: 1; }
+
+        /* Achievements: mobile touch tuning */
+        @media (max-width: 639px) {
+            .ach-arrow { display: none; } /* replaced by swipe gestures on touch */
+        }
+        @media (hover: none) {
+            .achievement-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: pan-y; }
+        }
+        .ach-swipe-hint { display: none; }
+        @media (hover: none) and (max-width: 639px) {
+            .ach-swipe-hint { display: block; }
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-brand-dark text-gray-900 dark:text-gray-100 font-sans">
+
+    <!-- Intro Overlay -->
+    <div id="intro-overlay">
+        <div class="intro-logo">
+            <div class="mb-5 flex items-center justify-center">
+                <img src="https://lh3.googleusercontent.com/d/1aFFlIwdpDMN-gA4J1w1QKDNFZ_AX4QRa"
+                     alt="ECHO Logo" class="h-24 w-auto object-contain drop-shadow-2xl">
+            </div>
+            <p class="text-white text-2xl font-black tracking-[0.4em]">ECHO</p>
+            <p class="text-gray-400 text-xs tracking-widest mt-1">FISAT ECE </p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-[9998] flex items-center gap-3 px-5 py-4 bg-gray-900 dark:bg-gray-800 text-white rounded-xl shadow-2xl border border-gray-700 translate-y-24 opacity-0">
+        <i id="toast-icon" class="fas fa-check-circle text-brand-orange text-xl"></i>
+        <span id="toast-message" class="font-semibold text-sm tracking-wide">Done</span>
+    </div>
+
+    <!-- Team Members Modal -->
+    <div id="team-modal" class="hidden fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+        <div id="team-modal-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer" onclick="closeTeamModal()"></div>
+        <div id="team-modal-content" class="relative bg-white dark:bg-brand-card w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <div class="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-brand-dark/50 rounded-t-2xl">
+                <div>
+                    <h3 id="team-modal-title" class="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100">Team Name</h3>
+                    <p class="text-sm text-brand-orange font-medium mt-1" id="team-modal-subtitle">Team Members</p>
+                </div>
+                <button onclick="closeTeamModal()" class="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 flex items-center justify-center transition-colors shadow-sm text-gray-600 dark:text-gray-300 flex-shrink-0">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 sm:p-6 overflow-y-auto flex-1 scroll-list bg-gray-50 dark:bg-[#0f1423] rounded-b-2xl">
+                <div id="team-modal-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <!-- Members will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievement Detail Modal -->
+    <div id="achievement-modal" class="hidden fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+        <div id="achievement-modal-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer" onclick="closeAchievementModal()"></div>
+        <div id="achievement-modal-content" class="relative liquid-glass w-full max-w-lg max-h-[90vh] flex flex-col transform scale-95 opacity-0">
+            <button onclick="closeAchievementModal()" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors shadow-sm text-gray-600 dark:text-gray-300 z-10">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="overflow-y-auto scroll-list">
+                <div class="pt-6 sm:pt-7 flex justify-center">
+                    <div id="achievement-modal-image-wrap" class="w-40 h-40 sm:w-48 sm:h-48 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 hidden flex items-center justify-center border border-gray-200 dark:border-gray-700 shadow-inner">
+                        <img id="achievement-modal-image" src="" alt="" class="max-w-full max-h-full object-contain">
+                    </div>
+                </div>
+                <div class="p-6 sm:p-7">
+                    <h3 id="achievement-modal-title" class="text-2xl font-extrabold text-gray-900 dark:text-gray-100 mb-2">Achievement Title</h3>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
+                        <span id="achievement-modal-names" class="text-sm text-brand-orange font-semibold"></span>
+                        <span id="achievement-modal-date" class="text-xs text-gray-400"></span>
+                    </div>
+                    <p id="achievement-modal-desc" class="text-gray-600 dark:text-gray-300 leading-relaxed text-sm mb-5"></p>
+                    <a id="achievement-modal-link" href="#" target="_blank" rel="noopener" class="hidden w-full items-center justify-center gap-2 bg-brand-orange hover:bg-yellow-500 text-white font-bold py-3 rounded-xl shadow-lg transition-colors">
+                        <i class="fas fa-external-link-alt"></i> View Link
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-brand-dark/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 page-enter">
+        <div class="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-[72px]">
+                <a href="#home" class="flex items-center gap-3 md:gap-4 group cursor-pointer">
+                    <img src="https://lh3.googleusercontent.com/d/1aFFlIwdpDMN-gA4J1w1QKDNFZ_AX4QRa" alt="ECHO Logo" class="h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105">
+                    <span class="w-px h-9 bg-gray-300 dark:bg-gray-700 flex-shrink-0"></span>
+                    <img src="https://lh3.googleusercontent.com/d/1rhsqMzNgzvkWdiGReadhYmFgovshvsXy" alt="FISAT Logo" class="h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105">
+                    <div class="hidden lg:flex flex-col justify-center leading-tight border-l-2 border-gray-300 dark:border-gray-700 pl-4 ml-1">
+                        <div class="font-bold text-[11px] md:text-xs tracking-widest text-gray-900 dark:text-gray-100 uppercase">Department of Electronics</div>
+                        <div class="font-bold text-[11px] md:text-xs tracking-widest text-gray-900 dark:text-gray-100 uppercase">And Communication Engineering</div>
+                    </div>
+                </a>
+                <div class="hidden md:flex items-center gap-5 xl:gap-6">
+                    <a href="#home" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">Home</a>
+                    <a href="#events" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">Events</a>
+                    <a href="#members" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">Members</a>
+                    <a href="#achievements" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">Achievements</a>
+                    <a href="#activities" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">Activities</a>
+                    <a href="#about" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">About</a>
+                    <a href="https://fisat.ac.in/" class="nav-link text-sm font-medium hover:text-brand-orange transition-colors">FISAT</a>
+
+                    <button id="theme-toggle" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Toggle dark/light mode">
+                        <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                        <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                </div>
+                <button id="theme-toggle-mobile" class="md:hidden w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                    <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="relative min-h-screen flex items-center justify-center text-center pt-24 pb-20 px-4 overflow-hidden">
+        <div class="blob-1 absolute top-1/3 left-1/4 w-80 h-80 bg-brand-orange/15 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
+        <div class="blob-2 absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/15 rounded-full blur-[120px] -z-10 pointer-events-none"></div>
+        <div class="max-w-4xl mx-auto z-10 page-enter" style="animation-delay: 2.6s;">
+            <p class="inline-block px-4 py-1 mb-6 text-xs font-semibold tracking-[0.2em] uppercase text-brand-orange border border-brand-orange/40 rounded-full bg-brand-orange/10">
+                FISAT ECE Department 
+            </p>
+            <h1 class="text-5xl sm:text-6xl md:text-7xl font-black mb-6 leading-tight">
+                Where Ideas <span class="text-gradient">ECHO</span>,<br>Future Ignites
+            </h1>
+            <p class="text-base md:text-lg text-gray-600 dark:text-gray-300 mb-10 max-w-2xl mx-auto leading-relaxed">
+                A vibrant community of engineers, researchers, and creators building the future through electronic technologies at FISAT.
+            </p>
+            <div class="flex flex-wrap gap-4 justify-center">
+                <a href="#events" class="px-8 py-3 bg-brand-orange text-white font-bold rounded-full shadow-lg hover:bg-yellow-500 hover:shadow-brand-orange/40 hover:-translate-y-1 transition-all duration-300">Our Events</a>
+                <a href="#about" class="px-8 py-3 border-2 border-gray-300 dark:border-gray-600 font-bold rounded-full hover:border-brand-orange hover:text-brand-orange hover:-translate-y-1 transition-all duration-300">Learn More</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Events Section -->
+    <section id="events" class="py-24 bg-gray-50 dark:bg-[#0f1423]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <p class="text-brand-orange text-xs font-bold tracking-[0.25em] uppercase mb-3">What's Happening</p>
+                <h2 class="text-4xl md:text-5xl font-extrabold mb-4">Events</h2>
+                <p class="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">From annual tech fests to workshops — here's what ECHO is up to.</p>
+            </div>
+            
+            <div id="events-grid" class="flex flex-wrap justify-center gap-8">
+                <div class="w-full text-center py-16 text-gray-400">
+                    <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-brand-orange/60"></i>
+                    Loading events…
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Members Section -->
+    <section id="members" class="py-24 bg-white dark:bg-brand-dark">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <p class="text-brand-orange text-xs font-bold tracking-[0.25em] uppercase mb-3">The People</p>
+                <h2 class="text-4xl md:text-5xl font-extrabold mb-4">Meet Our Team</h2>
+                <p class="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">The dedicated individuals driving innovation and excellence at ECHO.</p>
+            </div>
+
+            <!-- 1. Student Members (Appears First) -->
+            <div id="students-section" class="hidden mb-24">
+                <div id="members-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 max-w-5xl mx-auto">
+                    <div class="col-span-full text-center py-16 text-gray-400">
+                        <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-brand-orange/60"></i>
+                        Loading members…
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Faculty Mentors (Appears Second) -->
+            <div id="mentors-section" class="hidden">
+                <h3 class="text-3xl font-extrabold mb-10 text-center text-gray-800 dark:text-gray-100">
+                    <span class="text-brand-orange">Our</span> Mentors
+                </h3>
+                <div id="mentors-grid" class="flex flex-wrap justify-center gap-8 max-w-5xl mx-auto">
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+     <!-- Achievements Section -->
+    <section id="achievements" class="py-24 bg-gray-50 dark:bg-[#0f1423]">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <p class="text-brand-orange text-xs font-bold tracking-[0.25em] uppercase mb-3">Recognition</p>
+                <h2 class="text-4xl md:text-5xl font-extrabold mb-4">Patents & Achievements</h2>
+                <p class="text-gray-500 dark:text-gray-400">Showcasing the technical brilliance of our department members.</p>
+            </div>
+            <div class="relative max-w-[580px] mx-auto">
+                <div class="blob-1 absolute -top-6 -left-10 w-56 h-56 bg-brand-orange/25 rounded-full blur-[80px] -z-10 pointer-events-none"></div>
+                <div class="blob-2 absolute -bottom-10 -right-8 w-64 h-64 bg-blue-500/20 rounded-full blur-[90px] -z-10 pointer-events-none"></div>
+                <button id="ach-prev" onclick="navigateAchievement(-1)" class="ach-arrow ach-arrow-left" aria-label="Previous achievement"><i class="fas fa-chevron-left"></i></button>
+                <div id="achievements-list" class="ach-stage">
+                    <div class="text-center py-16 text-gray-400 w-full">
+                        <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-brand-orange/60"></i>
+                        Loading achievements…
+                    </div>
+                </div>
+                <button id="ach-next" onclick="navigateAchievement(1)" class="ach-arrow ach-arrow-right" aria-label="Next achievement"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <p id="ach-counter" class="text-center text-xs text-gray-400 mt-2"></p>
+            <p class="ach-swipe-hint text-center text-[11px] text-gray-400 mt-1">
+                <i class="fas fa-arrows-left-right mr-1"></i>Swipe to browse &nbsp;•&nbsp; <i class="fas fa-hand-pointer mr-1"></i>Hold to open link
+            </p>
+        </div>
+    </section>
+    <!-- Activities Section -->
+    <section id="activities" class="py-24 bg-white dark:bg-brand-dark">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 reveal">
+                <p class="text-brand-orange text-xs font-bold tracking-[0.25em] uppercase mb-3">What We Do</p>
+                <h2 class="text-4xl md:text-5xl font-extrabold mb-4">Activity Reports</h2>
+                <p class="text-gray-500 dark:text-gray-400">Explore our recent events, workshops, and tech fests.</p>
+            </div>
+            <div id="activities-list" class="reveal">
+                <div class="text-center py-16 text-gray-400">
+                    <i class="fas fa-circle-notch fa-spin text-3xl mb-3 block text-brand-orange/60"></i>
+                    Loading activities…
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- All Activities Modal -->
+    <div id="activities-modal" class="hidden fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
+        <div id="activities-modal-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer" onclick="closeActivitiesModal()"></div>
+        <div id="activities-modal-content" class="relative bg-white dark:bg-brand-card w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col transform scale-95 opacity-0">
+            <div class="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-brand-dark/50 rounded-t-2xl">
+                <div>
+                    <h3 class="text-2xl font-extrabold text-gray-900 dark:text-gray-100">All Activities</h3>
+                    <p id="activities-modal-count" class="text-sm text-brand-orange font-medium mt-1"></p>
+                </div>
+                <button onclick="closeActivitiesModal()" class="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 flex items-center justify-center transition-colors shadow-sm text-gray-600 dark:text-gray-300 flex-shrink-0">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto flex-1 scroll-list bg-gray-50 dark:bg-[#0f1423] rounded-b-2xl">
+                <div id="activities-modal-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <section id="about" class="py-24 bg-gray-50 dark:bg-[#0f1423]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-2 gap-14 items-start">
+                <div class="reveal">
+                    <p class="text-brand-orange text-xs font-bold tracking-[0.25em] uppercase mb-3">Who We Are</p>
+                    <h2 class="text-4xl md:text-5xl font-extrabold mb-6">About FISAT ECHO</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                        ECHO (Electronics and Communication Heuristic Organisation) is the premier student association of the ECE department at Federal Institute of Science and Technology (FISAT).
+                    </p>
+                    <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+                        Our mission is to bridge the gap between academia and industry by organising hackathons, technical workshops, and mentorship programs that equip students with state-of-the-art technological skills.
+                    </p>
+                    <div class="mt-8 flex gap-6">
+                        <div>
+                            <div class="text-3xl font-black text-brand-orange">10+</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Years Running</div>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-black text-brand-orange">200+</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Active Members</div>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-black text-brand-orange">50+</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Events Hosted</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-brand-card p-8 rounded-2xl glow-card reveal border border-gray-100 dark:border-gray-800" style="transition-delay: 150ms;">
+                    <h3 class="text-2xl font-bold mb-6">Contact Us</h3>
+                    <div id="contact-success" class="hidden mb-6 p-5 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-xl text-center">
+                        <i class="fas fa-check-circle text-green-500 text-3xl mb-2 block"></i>
+                        <p class="font-bold text-green-700 dark:text-green-400 text-lg">Message Submitted Successfully!</p>
+                        <p class="text-sm text-green-600 dark:text-green-500 mt-1">We will contact you soon. Thank you for reaching out!</p>
+                    </div>
+                    <form id="contact-form" onsubmit="handleContactSubmit(event)">
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Your Name</label>
+                            <input type="text" id="c-name" required placeholder="e.g. Arjun Nair" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange transition-all duration-200">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Your Email</label>
+                            <input type="email" id="c-email" required placeholder="arjun@example.com" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange transition-all duration-200">
+                        </div>
+                        <div class="mb-5">
+                            <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Message</label>
+                            <textarea id="c-message" rows="4" required placeholder="Your message here…" class="w-full px-4 py-2.5 rounded-xl resize-none bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange transition-all duration-200"></textarea>
+                        </div>
+                        <button type="submit" id="contact-submit-btn" class="w-full bg-brand-orange hover:bg-yellow-500 text-white font-bold py-3 rounded-xl shadow-lg hover:shadow-brand-orange/40 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-100 dark:bg-[#07090f] border-t border-gray-200 dark:border-gray-800 py-10 text-center text-sm text-gray-500">
+        <div class="mb-2 flex justify-center items-center gap-2">
+            <img src="https://lh3.googleusercontent.com/d/1aFFlIwdpDMN-gA4J1w1QKDNFZ_AX4QRa" alt="ECHO Logo" class="h-7 w-auto object-contain">
+            <span class="font-bold text-gray-700 dark:text-gray-300">FISAT ECHO</span>
+        </div>
+        <p class="mb-3">&copy; 2025–2026 ECHO | FISAT. All rights reserved.</p>
+        <p>Email :<a href="mailto:echo@fisat.ac.in">echo@fisat.ac.in</a> </p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+</body>
+</html>
+
+
